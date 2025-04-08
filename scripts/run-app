@@ -1,5 +1,13 @@
-#/bin/ash
+#!/bin/ash
 
-rm Cargo.lock
+cd /app
+
+[ -f Cargo.lock ] && rm Cargo.lock
+
 cargo generate-lockfile
+
+clear
+
+export RUST_BACKTRACE=1
+
 cargo run -q
