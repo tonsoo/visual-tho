@@ -1,3 +1,5 @@
 #/bin/ash
 
+rm Cargo.lock
+cargo generate-lockfile
 cargo run -q
