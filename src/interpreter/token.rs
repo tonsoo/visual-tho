@@ -1,12 +1,6 @@
-use super::interpreter::Interpreter;
+use eframe::egui_glow::CallbackFn;
 
-pub enum TokenTypes {
-    Keyword,
-    Identifier,
-    Number,
-    Operator,
-    Symbol,
-}
+use super::interpreter::Interpreter;
 
 pub enum Token {
     Keyword(String),
@@ -16,50 +10,32 @@ pub enum Token {
     Symbol(char),
 }
 
-pub struct TokenRule {
-    sequence: Vec<Token>,
-}
-
-impl TokenRule {
-    pub fn new(rules: Vec<Token>) -> TokenRule {
-        TokenRule { sequence: rules }
-    }
-
-    pub fn get_sequence(&self) -> &Vec<Token> {
-        &self.sequence
-    }
-}
-
 impl Token {
-    pub fn get_type(&self) -> TokenTypes {
-        match self {
-            Token::Keyword(_) => TokenTypes::Keyword,
-            Token::Identifier(_) => TokenTypes::Identifier,
-            Token::Number(_) => TokenTypes::Number,
-            Token::Operator(_) => TokenTypes::Operator,
-            Token::Symbol(_) => TokenTypes::Symbol,
-        }
-    }
+    
 }
 
 impl Interpreter {
-    pub fn tokenize(&self) -> Vec<Token> {
+    pub fn tokenize(&mut self) {
         let mut min_buffer_size:i32 = 0;
         let mut max_buffer_size:i32 = 0;
 
-        for rule in self.get_rules() {
+        if self.get_language().is_none() {
+            // TODO: Error
+            println!("Select a language to continue.");
+            return;
+        }
+        
+        for rule in self.get_language().as_ref().unwrap().get_rules() {
             for token in rule.get_sequence() {
                 
             }
         }
         
-        let mut tokens: Vec<Token> = Vec::new();
+        self.tokens = Vec::new();
         let mut buffer = String::new();
     
         for char in self.get_code().split("") {
             buffer += char;
         }
-    
-        tokens
     }
 }
