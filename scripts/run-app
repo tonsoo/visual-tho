@@ -1,4 +1,4 @@
-#!/bin/ash
+#!/bin/bash
 
 cd /app
 
@@ -10,4 +10,4 @@ clear
 
 export RUST_BACKTRACE=1
 
-cargo run -q
+cargo run
