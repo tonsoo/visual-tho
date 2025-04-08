@@ -1,18 +1,23 @@
-FROM rust:1.77-slim
+FROM ubuntu:22.04
 
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    libgtk-3-dev \
-    libwebkit2gtk-4.0-dev \
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt install -y \
     curl \
-    git \
-    bash \
+    build-essential \
+    libclang-dev \
+    libgtk-3-dev \
+    libxcb-render0-dev \
+    libxcb-shape0-dev \
+    libxcb-xfixes0-dev \
+    libxkbcommon-dev \
+    libxkbcommon-x11-dev \
     libssl-dev \
     pkg-config \
-    nodejs \
-    npm \
-    && apt-get clean
+    x11-apps \
+    && apt clean && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup update
 
 WORKDIR /app
-
-CMD ["tail", "-f", "/dev/null"]
+CMD ["bash"]
