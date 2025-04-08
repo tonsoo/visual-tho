@@ -8,3 +8,8 @@ services:
       - ./scripts/run-app:/usr/local/bin/run-app
       - ./scripts/build-app:/usr/local/bin/build-app
     restart: on-failure
+    networks:
+      - app-network
+
+networks:
+  app-network:
