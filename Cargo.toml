@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+atty = "0.2.14"
 eframe = "0.31.1"
 egui = "0.31.1"
