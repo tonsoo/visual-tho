@@ -2,12 +2,27 @@
 
 cd /app
 
-[ -f Cargo.lock ] && rm Cargo.lock
+BACKTRACE=0
+CACHE=0
+RESET_CARGOLOCK=0
 
-cargo generate-lockfile
+for arg in "$@"; do
+  case "$arg" in
+    --trace) BACKTRACE=1 ;;
+    --cache) CACHE=1 ;;
+    --gen-lock-file) RESET_CARGOLOCK=1 ;;
+  esac
+done
+
+if [ "$RESET_CARGOLOCK" = 1 ]; then
+    [ -f Cargo.lock ] && rm Cargo.lock
+
+    cargo generate-lockfile
+fi
 
 clear
 
-export RUST_BACKTRACE=1
+[ "$BACKTRACE" = 1 ] && export RUST_BACKTRACE=1
+[ "$CACHE" = 1 ] && export RUSTC_WRAPPER="sccache"
 
 cargo run
