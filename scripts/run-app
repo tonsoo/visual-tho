@@ -22,7 +22,7 @@ fi
 
 clear
 
-[ "$BACKTRACE" = 1 ] && export RUST_BACKTRACE=1
+[ "$BACKTRACE" = 1 ] && export RUST_BACKTRACE=full
 [ "$CACHE" = 1 ] && export RUSTC_WRAPPER="sccache"
 
 cargo run

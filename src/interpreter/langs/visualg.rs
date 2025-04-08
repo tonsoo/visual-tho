@@ -9,7 +9,7 @@ pub fn visual_g() -> Language {
             TokenRule::with_name(
                 String::from("Ínicio"),
                 vec![
-                    TokenRuleItem::Keyword(String::from("Inicio"))
+                    TokenRuleItem::Keyword(String::from("inicio")),
                 ]
             ),
         ]
