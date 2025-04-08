@@ -1,0 +1,8 @@
+services:
+  app:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    restart: on-failure
