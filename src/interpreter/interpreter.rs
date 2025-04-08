@@ -17,6 +17,10 @@ impl Interpreter {
         self.rules = rules
     }
 
+    pub fn get_rules(&self) -> &Vec<TokenRule> {
+        &self.rules
+    }
+
     fn set_code(&mut self, code: &str) {
         self.code = String::from(code);
     }

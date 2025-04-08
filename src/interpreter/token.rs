@@ -24,6 +24,10 @@ impl TokenRule {
     pub fn new(rules: Vec<Token>) -> TokenRule {
         TokenRule { sequence: rules }
     }
+
+    pub fn get_sequence(&self) -> &Vec<Token> {
+        &self.sequence
+    }
 }
 
 impl Token {
@@ -40,6 +44,15 @@ impl Token {
 
 impl Interpreter {
     pub fn tokenize(&self) -> Vec<Token> {
+        let mut min_buffer_size:i32 = 0;
+        let mut max_buffer_size:i32 = 0;
+
+        for rule in self.get_rules() {
+            for token in rule.get_sequence() {
+                
+            }
+        }
+        
         let mut tokens: Vec<Token> = Vec::new();
         let mut buffer = String::new();
     
