@@ -9,12 +9,12 @@ pub struct Window {
 }
 
 impl Window {
-    pub fn is_enabled(&self) {
+    pub fn is_enabled(&self) -> bool {
         self.enabled
     }
 
     pub fn set_title(&mut self, title : &str) {
-        self.title = String.from(title);
+        self.title = String::from(title);
     }
 }
 
@@ -28,7 +28,7 @@ impl eframe::App for Window {
                 "Enable"
             );
 
-            if self.is_enabled() {
+            if self.enabled {
                 ui.text_edit_multiline(&mut self.code);
 
                 ui.button("Submit").clicked().then(|| {
@@ -46,7 +46,7 @@ pub fn run_window(window: Window) -> Result<(), eframe::Error> {
         eframe::NativeOptions::default(),
         Box::new(
             |_cc| std::result::Result::Ok(
-                Box::new(app::window::Window::default())
+                Box::new(Window::default())
             )
         ),
     )
