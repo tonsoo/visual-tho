@@ -1,4 +1,6 @@
-use super::{language::Language, rules::{TokenRule, TokenRuleItem}, token::Token};
+use egui::color_picker::color_edit_button_hsva;
+
+use super::{language::Language, rules::{TokenRule, TokenRuleItem, TokenWrapperRule}, token::Token};
 
 pub struct Interpreter {
     language: Option<Language>,
@@ -85,29 +87,22 @@ impl Interpreter {
             .replace("  ", " ")
     }
 
-    pub fn get_buffer_range(&self) -> Range {
+    fn get_rules_range(&self, rules: &Vec<TokenRule>) -> Range {
         let mut range = Range { min: usize::MAX, max: 0 };
 
-        let rules = self.get_rules();
-
-        if rules.is_none() {
-            return range;
-        }
-
-        for rule in rules.unwrap() {
+        for rule in rules {
             for token in rule.get_sequence() {
                 let mut compare_text = String::new();
                 match token {
                     TokenRuleItem::Keyword(text) => {
                         compare_text = text.to_string();
                     }
-                    TokenRuleItem::OneOf(list) => {
-                        let min = list.iter().min_by_key(|s| s.len());
-                        if min.is_some() {
-                            compare_text = min.unwrap().to_string();
-                        }
+                    TokenRuleItem::OneOrMore(list) => {
+                        let sub_range = self.get_rules_range(&rules);
+                        range.max(sub_range.max);
+                        range.min(sub_range.min);
                     }
-                    TokenRuleItem::Wrapped(start, end) => {
+                    TokenRuleItem::Wrapped(TokenWrapperRule::Simple { start, end, rules_between }) => {
                         if start.len() < end.len() {
                             compare_text = start.to_string();
                         } else {
@@ -125,6 +120,16 @@ impl Interpreter {
         range
     }
 
+    pub fn get_buffer_range(&self) -> Range {
+        let rules = self.get_rules();
+
+        if rules.is_none() {
+            return Range { min: usize::MAX, max: 0 };
+        }
+
+        self.get_rules_range(&rules.unwrap())
+    }
+
     pub fn tokenize(&mut self) {
         if self.get_language().is_none() {
             // TODO: Error
@@ -140,6 +145,7 @@ impl Interpreter {
     
         let mut code = self.get_formatted_code();
         let rules = self.get_rules();
+        let mut rule_stack:Vec<&TokenRule> = vec![];
 
         for char in code.chars() {
             buffer += &char.to_string();
@@ -148,16 +154,34 @@ impl Interpreter {
                 continue;
             }
 
+            if rules.is_some() {
+                for rule in rules.unwrap() {
+                    let mut follows_sequence = true;
+                    for token in rule.get_sequence() {
+                        match token {
+                            TokenRuleItem::Keyword(word) => {
+                                let mut buffer_chars = buffer.chars();
+                                for i in (0..(buffer.len() - word.len())) {
+                                    buffer_chars.next();
+                                }
+                                follows_sequence = buffer_chars.collect::<String>() == word.to_string();
+                            }
+                            _ => follows_sequence = false
+                        }
+                    }
+
+                    if follows_sequence {
+                        println!("Wow, followed sequence for: {buffer}");
+                        rule_stack.push(rule);
+                        buffer.clear();
+                    }
+                }
+            }
             
-
             if buffer.len() > max_buffer_size {
-                print!("Previous: {}, ", buffer);
-
                 let mut buffer_chars = buffer.chars();
                 buffer_chars.next();
                 buffer = buffer_chars.collect();
-                
-                println!("New: {}", buffer);
             }
         }
     }
