@@ -1,19 +1,11 @@
-use super::rules::TokenRule;
+use super::tokens::separator::TokenSeparators;
 
-pub struct Language {
-    name: String,
-    rules: Vec<TokenRule>
-}
+pub trait Language {
+    fn escape(&self) -> &str;
 
-impl Language {
-    pub fn new(name: String, rules: Vec<TokenRule>) -> Self {
-        Language {
-            name: name,
-            rules: rules
-        }
-    }
+    fn name(&self) -> &str;
 
-    pub fn get_rules(&self) -> &Vec<TokenRule> {
-        &self.rules
-    }
+    fn sepataros(&self) -> Vec<TokenSeparators>;
+
+    // fn syntax() -> Vec<TokenTypes>;
 }

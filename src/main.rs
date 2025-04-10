@@ -1,18 +1,15 @@
-use interpreter::{langs::visualg::visual_g, language::Language, rules::{TokenRule, TokenRuleItem}, token::Token};
+use interpreter::{interpreter::Interpreter, language::Language, languages::visualg::VisuAlg};
 
 mod app;
 mod interpreter;
 
 fn main() {
     if atty::is(atty::Stream::Stdin) {
-        println!("terminal");
+        let lang = VisuAlg {};
 
-        let mut inter = interpreter::interpreter::Interpreter
-            ::from_file("tests/scripts/visualg/script-1.alg");
+        let int = Interpreter::from_file(String::from("tests/scripts/visualg/script-1.alg"));
 
-        inter.set_language(visual_g());
-
-        inter.tokenize();
+        int.interpret(Box::new(lang));
 
         return;
     }

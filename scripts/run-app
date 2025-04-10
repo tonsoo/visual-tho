@@ -15,14 +15,26 @@ for arg in "$@"; do
 done
 
 if [ "$RESET_CARGOLOCK" = 1 ]; then
-    [ -f Cargo.lock ] && rm Cargo.lock
+  echo "Removing Cargo.lock"
 
-    cargo generate-lockfile
+  sleep 1
+
+  [ -f Cargo.lock ] && rm Cargo.lock
+
+  echo "Resetting cargo"
+
+  sleep 1
+  
+  cargo generate-lockfile
 fi
 
 clear
 
-[ "$BACKTRACE" = 1 ] && export RUST_BACKTRACE=full
-[ "$CACHE" = 1 ] && export RUSTC_WRAPPER="sccache"
+[ "$BACKTRACE" = 1 ] && echo "Adding backtrace" && sleep 1 && export RUST_BACKTRACE=full
+[ "$CACHE" = 1 ] && echo "Adding cache" && sleep 1 && export RUSTC_WRAPPER="sccache"
+
+echo "Running cargo"
+
+sleep 1
 
 cargo run
