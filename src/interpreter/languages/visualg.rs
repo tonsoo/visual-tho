@@ -27,7 +27,7 @@ impl Language for VisuAlg {
                 settings: SeparatorSetting::new(TokenTypes::None)
             },
             TokenSeparators::InAlphaRange {
-                alphas: vec![ '.', ',' ],
+                alphas: vec![ '.', ',', ':' ],
                 settings: SeparatorSetting::new(TokenTypes::Keyword)
             },
             TokenSeparators::AlphaUntilMatch {

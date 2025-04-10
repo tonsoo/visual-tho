@@ -6,7 +6,10 @@ pub struct Token {
     schema: TokenTypes
 }
 
+#[derive(Clone)]
 pub enum TokenIndex {
+    None,
+
     Simple {
         start: usize,
         end: usize
@@ -44,6 +47,7 @@ impl TokenIndex {
             TokenIndex::Simple { start, end } => format!("{}:{}", start, end),
             TokenIndex::Group { first_start, first_end, second_start, second_end }
                 => format!("{}:{}-{}:{}", first_start, first_end, second_start, second_end),
+            TokenIndex::None => String::from("null")
         }
     }
 }
