@@ -1,5 +1,5 @@
 use crate::interpreter::tokens::schema::TokenTypes;
-use crate::interpreter::tokens::separator::{SeparatorMatchSetting, SeparatorSetting};
+use crate::interpreter::tokens::separator::{SeparatorSetting};
 
 use super::super::tokens::separator::TokenSeparators;
 
@@ -16,7 +16,7 @@ impl Language for VisuAlg {
         "VisuAlg"
     }
 
-    fn sepataros(&self) -> Vec<TokenSeparators> {
+    fn separators(&self) -> Vec<TokenSeparators> {
         vec![
             TokenSeparators::Alpha {
                 alpha: ' ',
@@ -30,18 +30,8 @@ impl Language for VisuAlg {
                 alphas: vec![ '.', ',', ':' ],
                 settings: SeparatorSetting::new(TokenTypes::Keyword)
             },
-            TokenSeparators::AlphaUntilMatch {
-                alpha_start: '\'', alpha_end: '\'',
-                settings: SeparatorMatchSetting::new(TokenTypes::Groupper)
-                    .skip_content()
-            },
-            TokenSeparators::AlphaUntilMatch {
-                alpha_start: '"', alpha_end: '"',
-                settings: SeparatorMatchSetting::new(TokenTypes::Groupper)
-                    .skip_content()
-            },
             TokenSeparators::InAlphaRange {
-                alphas: vec![ '[', ']', '(', ')', '{', '}' ],
+                alphas: vec![ '"', '\'', '[', ']', '(', ')', '{', '}' ],
                 settings: SeparatorSetting::new(TokenTypes::Groupper)
             },
             TokenSeparators::InAlphaRange {

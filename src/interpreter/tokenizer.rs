@@ -1,6 +1,6 @@
 use super::tokens::schema::TokenTypes;
 use super::{language::Language, tokens::token::{Token, TokenIndex}};
-use super::tokens::separator::{SeparatorMatchSetting, SeparatorSetting, TokenSeparators};
+use super::tokens::separator::{SeparatorSetting, TokenSeparators};
 
 struct Range<T> {
     min:T,
@@ -28,47 +28,27 @@ impl<T: PartialOrd + Clone> Range<T> {
     }
 }
 
-#[derive(Clone)]
-pub struct TokenMatchItem {
-    index:TokenIndex,
-    token:Separator,
-}
-
-#[derive(Clone)]
-pub enum TokenMatch {
-    Current { start:TokenMatchItem, end: Option<TokenMatchItem> },
-    None
-}
-
 pub struct Tokenizer {
     language:Box<dyn Language>,
     tokens:Vec<Token>,
     index:usize,
-    current_match:TokenMatch,
-}
-
-#[derive(Clone)]
-enum Setting {
-    Default(SeparatorSetting),
-    Match(SeparatorMatchSetting, Box<Separator>),
-    MatchEnd(SeparatorMatchSetting),
 }
 
 #[derive(Clone)]
 struct Separator {
     value:String,
-    settings:Setting,
+    settings:SeparatorSetting,
 }
 
 impl Separator {
-    fn new(value:String, settings:Setting) -> Self {
+    fn new(value:String, settings:SeparatorSetting) -> Self {
         Self { value, settings }
     }
 }
 
 impl Tokenizer {
     pub fn new(language:Box<dyn Language>) -> Self {
-        Self { language, tokens: vec![], index: 0, current_match: TokenMatch::None }
+        Self { language, tokens: vec![], index: 0 }
     }
 
     fn get_max_range(&self, separators:&Vec<Separator>) -> Range<usize> {
@@ -93,34 +73,24 @@ impl Tokenizer {
     fn get_ordered_separators(&self) -> Vec<Separator> {
         use TokenSeparators::*;
 
-        let separators = self.language.sepataros();
+        let separators = self.language.separators();
 
         let mut new_separators:Vec<Separator> = vec![];
 
         for s in separators {
             match s {
                 Alpha { alpha, settings }
-                    => new_separators.push(Separator::new(String::from(alpha), Setting::Default(settings))),
-                AlphaUntilMatch { alpha_start, alpha_end, settings } => {
-                    let separator = Separator::new(String::from(alpha_end), Setting::MatchEnd(settings.clone()));
-                    new_separators.push(Separator::new(String::from(alpha_start), Setting::Match(settings.clone(), Box::new(separator.clone()))));
-                    new_separators.push(separator);
-                },
+                    => new_separators.push(Separator::new(String::from(alpha), settings)),
                 InAlphaRange { alphas, settings } => {
                     for a in alphas {
-                        new_separators.push(Separator::new(String::from(a), Setting::Default(settings.clone())))
+                        new_separators.push(Separator::new(String::from(a), settings.clone()))
                     }
                 },
 
-                Word { word, settings } => new_separators.push(Separator::new(word, Setting::Default(settings))),
-                WordUntilMatch { word_start, word_end, settings } => {
-                    let separator = Separator::new(word_end, Setting::MatchEnd(settings.clone()));
-                    new_separators.push(Separator::new(word_start, Setting::Match(settings.clone(), Box::new(separator.clone()))));
-                    new_separators.push(separator);
-                },
+                Word { word, settings } => new_separators.push(Separator::new(word, settings)),
                 InWordRange { words, settings } => {
                     for w in words {
-                        new_separators.push(Separator::new(w, Setting::Default(settings.clone())));
+                        new_separators.push(Separator::new(w, settings.clone()));
                     }
                 }
             }
@@ -162,7 +132,6 @@ impl Tokenizer {
             }
 
             self.bufferize(&mut buffer, &separators);
-            self.apply_delimeters(&String::from(code));
 
             if buffer.len() >= buffer_range.max {
                 let mut chars = buffer.chars();
@@ -178,7 +147,7 @@ impl Tokenizer {
                 let start = (self.index + 1) - buffer_range.max - arbitrary_buffer.len();
                 self.push_token(
                     Token::new(
-                        TokenIndex::Simple { start: start, end: start + arbitrary_buffer.len() },
+                        TokenIndex::new(start, start + arbitrary_buffer.len()),
                         arbitrary_buffer.clone(),
                         TokenTypes::Custom { name: arbitrary_buffer.clone() },
                     )
@@ -192,32 +161,14 @@ impl Tokenizer {
             }
         }
 
-        let mut skip_for = 0;
-        for _ in 0..buffer.len() {
-            if skip_for > 0 {
-                skip_for -= 1;
-                continue;
-            }
+        let mut loop_index = 0;
+        while loop_index < buffer.len() {
+            let skip = self.bufferize(&mut buffer, &separators);
 
-            skip_for = self.bufferize(&mut buffer, &separators);
-            self.apply_delimeters(&String::from(code));
-        }
-    }
-
-    fn apply_delimeters(&mut self, code:&String) {
-        if let TokenMatch::Current { start, end } = self.current_match.clone() {
-            if let Some(_end) = end {
-                let start_index = match start.index {
-                    TokenIndex::Simple { start, end } => end,
-                    _ => 0
-                };
-                let end_index = match _end.index {
-                    TokenIndex::Simple { start, end } => start,
-                    _ => start_index
-                };;
-                let wrap_content = String::from(&code[start_index..end_index]);
-
-                println!("Found: {}", wrap_content);
+            if skip > 0 {
+                loop_index += skip;
+            } else {
+                loop_index += 1;
             }
         }
     }
@@ -241,114 +192,32 @@ impl Tokenizer {
     }
 
     fn tokenize_buffer_piece(&mut self, buffer:String, separators:&Vec<Separator>) -> usize {
-        let mut skip_content = false;
-        let mut end_separator = Option::None;
-
-        if let TokenMatch::Current { start, end } = self.current_match.clone() {
-            skip_content = match start.token.settings {
-                Setting::Default(s) => false,
-                Setting::Match(s, sep) => {
-                    end_separator = Option::Some(sep);
-                    s.is_skip_content()
-                }
-                Setting::MatchEnd(s) => s.is_skip_content()
-            };
-
-            if end_separator.is_none() {
-                println!("Wtf?");
-            }
-        }
-
         for separator in separators {
             let mut compare = buffer.clone();
-            let mut value = separator.value.clone();
-            let mut include = true;
-            let mut schema = TokenTypes::None;
-            let mut match_separator:Option<Separator> = Option::None;
-            match separator.settings.clone() {
-                Setting::Default(s) => {
-                    if !s.is_case_sensitive() {
-                        compare = compare.to_lowercase();
-                    }
-
-                    if !s.is_inclusive() {
-                        include = false;
-                    }
-
-                    schema = s.map().clone();
-                }
-                Setting::MatchEnd(s) => {
-                    if let Some(end_sep) = end_separator.clone() {
-                        assert_eq!(end_sep.value, value);
-                        value = end_sep.value;
-                    }
-                    
-                    if !s.is_case_sensitive() {
-                        compare = compare.to_lowercase();
-                        value = value.to_lowercase();
-                    }
-
-                    if !s.is_delimeter_inclusive() {
-                        include = false;
-                    }
-                }
-                Setting::Match(s, end) => {
-                    if !s.is_case_sensitive() {
-                        compare = compare.to_lowercase();
-                        value = value.to_lowercase();
-                    }
-
-                    if !s.is_delimeter_inclusive() {
-                        include = false;
-                    }
-
-                    match_separator = Option::Some(*end);
-                }
+            let value = separator.value.clone();
+            let schema = separator.settings.map().clone();
+            
+            if !separator.settings.is_case_sensitive() {
+                compare = compare.to_lowercase();
             }
             
-            if compare.starts_with(&value) {
-                let value_length = separator.value.len();
-                if let None = match_separator {
-                    if include && !skip_content {
-                        let start = (self.index + 1) - compare.len();
-                        self.push_token(
-                            Token::new(
-                                TokenIndex::Simple { start: start, end: start + value_length },
-                                separator.value.clone(),
-                                schema
-                            )
-                        );
-                    }
-                }
-
-                if let Some(separator) = match_separator {
-                    println!("separator: {}", separator.value);
-                    
-                    if let Setting::Match(..) = separator.settings {
-                        println!("\tmatch");
-                        self.current_match = TokenMatch::Current {
-                            start: TokenMatchItem {
-                                index: TokenIndex::Simple {
-                                    start: self.index - value_length,
-                                    end: self.index,
-                                },
-                                token: separator
-                            },
-                            end: None
-                        };
-                    } else {
-                        println!("{}", String::from(
-                            match separator.settings.clone() {
-                                Setting::Default(..) => "\tdefault",
-                                Setting::MatchEnd(..) => "\tmatch end",
-                                _ => "\t match"
-                            }
-                        ));
-                    }
-                }
-
-                return value_length
+            if !compare.starts_with(&value) {
+                continue
             }
+
+            let value_length = value.len();
+            if separator.settings.is_inclusive() {
+                let start = (self.index + 1) - compare.len();
+                self.push_token(
+                    Token::new(
+                        TokenIndex::new(start, start + value_length),
+                        value.clone(),
+                        schema
+                    )
+                );
+            }
+
+            return value_length
         }
 
         0

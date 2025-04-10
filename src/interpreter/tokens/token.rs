@@ -7,20 +7,9 @@ pub struct Token {
 }
 
 #[derive(Clone)]
-pub enum TokenIndex {
-    None,
-
-    Simple {
-        start: usize,
-        end: usize
-    },
-
-    Group {
-        first_start: usize,
-        first_end: usize,
-        second_start: usize,
-        second_end: usize,
-    }
+pub struct  TokenIndex {
+    start: usize,
+    end: usize
 }
 
 impl Token {
@@ -42,12 +31,11 @@ impl Token {
 }
 
 impl TokenIndex {
+    pub fn new(start:usize, end:usize) -> Self {
+        Self { start, end }
+    }
+
     pub fn to_string(&self) -> String {
-        match self {
-            TokenIndex::Simple { start, end } => format!("{}:{}", start, end),
-            TokenIndex::Group { first_start, first_end, second_start, second_end }
-                => format!("{}:{}-{}:{}", first_start, first_end, second_start, second_end),
-            TokenIndex::None => String::from("null")
-        }
+        format!("{}:{}", self.start, self.end)
     }
 }

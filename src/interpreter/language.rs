@@ -5,7 +5,7 @@ pub trait Language {
 
     fn name(&self) -> &str;
 
-    fn sepataros(&self) -> Vec<TokenSeparators>;
+    fn separators(&self) -> Vec<TokenSeparators>;
 
     // fn syntax() -> Vec<TokenTypes>;
 }
