@@ -1,4 +1,4 @@
-pub mod syntax;
+pub mod syntaxer;
 pub mod runner;
 pub mod language;
 pub mod languages;

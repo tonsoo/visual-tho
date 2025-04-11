@@ -1,4 +1,4 @@
-use interpreter::{interpreter::Interpreter, language::Language, languages::visualg::VisuAlg};
+use interpreter::{interpreter::Interpreter, languages::visualg::VisuAlg};
 
 mod app;
 mod interpreter;
@@ -7,7 +7,7 @@ fn main() {
     if atty::is(atty::Stream::Stdin) {
         let lang = VisuAlg {};
 
-        let int = Interpreter::from_file(String::from("tests/scripts/visualg/script-1.alg"));
+        let mut int = Interpreter::from_file(String::from("tests/scripts/visualg/script-1.alg"));
 
         int.interpret(Box::new(lang));
 

@@ -59,12 +59,12 @@ impl Tokenizer {
         let mut min = 0;
         let mut max = 0;
 
-        if let Some(_min) = separators.iter().min_by_key(|a| a.value.len()) {
-            min = _min.value.len();
+        if let Some(_min) = separators.iter().min_by_key(|a| a.value.chars().count()) {
+            min = _min.value.chars().count();
         }
 
-        if let Some(_max) = separators.iter().max_by_key(|a| a.value.len()) {
-            max = _max.value.len();
+        if let Some(_max) = separators.iter().max_by_key(|a| a.value.chars().count()) {
+            max = _max.value.chars().count();
         }
 
         Range::new(min, max)
@@ -96,7 +96,9 @@ impl Tokenizer {
             }
         }
 
-        new_separators.sort_by(|a, b| b.value.len().cmp(&a.value.len()));
+        new_separators.sort_by(|a, b|
+            b.value.chars().count().cmp(&a.value.chars().count())
+        );
 
         new_separators
     }
@@ -110,59 +112,31 @@ impl Tokenizer {
         let buffer_range = self.get_max_range(&separators);
 
         let mut buffer = String::new();
-        let mut arbitrary_buffer = String::new();
         let mut can_count = false;
-        let mut skip_logic_for = 0;
-        for char in code.chars() {
-            if skip_logic_for > 0 {
-                skip_logic_for -= 1;
-            }
-            
-            if can_count {
-                self.index += 1;
-            } else {
-                can_count = true;
-            }
+        
+        for (i, char) in code.char_indices() {
+            self.index = i;
 
             let char_text = String::from(char);
-            buffer += &char_text.to_string();
+            buffer += &char_text;
 
-            if buffer.len() < buffer_range.max {
+            if buffer.chars().count() < buffer_range.max {
                 continue;
             }
 
             self.bufferize(&mut buffer, &separators);
 
-            if buffer.len() >= buffer_range.max {
+            if buffer.chars().count() >= buffer_range.max {
                 let mut chars = buffer.chars();
-                
                 if let Some(a_char) = chars.next() {
-                    arbitrary_buffer += &String::from(a_char);
+                    self.push_unknown_character(a_char, chars.clone().count());
                 }
-                
                 buffer = chars.collect();
-            } else if arbitrary_buffer.len() > 0 {
-                let popped = self.pop_token();
-
-                let start = (self.index + 1) - buffer_range.max - arbitrary_buffer.len();
-                self.push_token(
-                    Token::new(
-                        TokenIndex::new(start, start + arbitrary_buffer.len()),
-                        arbitrary_buffer.clone(),
-                        TokenTypes::Custom { name: arbitrary_buffer.clone() },
-                    )
-                );
-
-                if let Some(token) = popped {
-                    self.push_token(token);
-                }
-
-                arbitrary_buffer.clear();
             }
         }
 
         let mut loop_index = 0;
-        while loop_index < buffer.len() {
+        while loop_index < buffer.chars().count() {
             let skip = self.bufferize(&mut buffer, &separators);
 
             if skip > 0 {
@@ -177,8 +151,6 @@ impl Tokenizer {
         let skip_chars = self.tokenize_buffer_piece(buffer.clone(), &separators);
 
         if skip_chars > 0 {
-            self.index += skip_chars;
-
             let mut chars = buffer.chars();
 
             for _ in 0..skip_chars {
@@ -195,7 +167,6 @@ impl Tokenizer {
         for separator in separators {
             let mut compare = buffer.clone();
             let value = separator.value.clone();
-            let schema = separator.settings.map().clone();
             
             if !separator.settings.is_case_sensitive() {
                 compare = compare.to_lowercase();
@@ -205,15 +176,22 @@ impl Tokenizer {
                 continue
             }
 
-            let value_length = value.len();
+            let schema = separator.settings.map().clone();
+
+            let value_length = value.chars().count();
             if separator.settings.is_inclusive() {
-                let start = (self.index + 1) - compare.len();
+                let length = compare.chars().count() - 1;
+                let mut start = 0;
+                if self.index > length {
+                    start = self.index - length;
+                }
                 self.push_token(
                     Token::new(
                         TokenIndex::new(start, start + value_length),
                         value.clone(),
                         schema
-                    )
+                    ),
+                    true
                 );
             }
 
@@ -223,7 +201,54 @@ impl Tokenizer {
         0
     }
 
-    fn push_token(&mut self, token:Token) {
+    fn push_unknown_character(&mut self, char:char, buffer_length:usize) {
+        let last = self.tokens.last();
+        let mut new_token:Option<Token> = None;
+        let mut index = 0;
+        if self.index > buffer_length {
+            index = self.index - buffer_length;
+        }
+        if let Some(token) = last {
+            if let TokenTypes::Custom { name } = token.schema() {
+                if name == "unknown" {
+                    let mut value = token.value().to_string();
+                    value.push_str(&String::from(char));
+                    new_token = Some(Token::new(
+                        TokenIndex::new(token.index().start(), index),
+                        value,
+                        TokenTypes::Custom { name: String::from("unknown") }
+                    ));
+                    self.pop_token();
+                }
+            }
+        }
+
+        if new_token.is_none() {
+            new_token = Some(Token::new(
+                TokenIndex::new(index, index + 1),
+                String::from(char),
+                TokenTypes::Custom { name: String::from("unknown") }
+            ));
+        }
+
+        if let Some(token) = new_token {
+            self.tokens.push(token);
+        }
+    }
+
+    fn push_token(&mut self, token:Token, group:bool) {
+        if group {
+            let last = self.tokens.last();
+            if let Some(last_token) = last {
+                if last_token.value() == token.value() {
+                    let mut popped = self.pop_token().unwrap();
+                    popped.increase_count();
+                    self.push_token(popped, true);
+                    return;
+                }
+            }
+        }
+        
         self.tokens.push(token);
     }
 
@@ -233,7 +258,11 @@ impl Tokenizer {
 
     pub fn print(&self) {
         for t in &self.tokens {
-            println!("{}[{}]-{}", t.value(), t.schema().to_string(), t.index().to_string());
+            let mut value = t.value().clone();
+            for _ in 1..*t.count() {
+                value += &t.value();
+            }
+            println!("{} [{}] - {}", value, t.schema().to_string(), t.index().to_string());
         }
     }
 }

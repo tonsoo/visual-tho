@@ -21,10 +21,12 @@ impl Language for VisuAlg {
             TokenSeparators::Alpha {
                 alpha: ' ',
                 settings: SeparatorSetting::new(TokenTypes::None)
+                    .gruppable()
             },
             TokenSeparators::Alpha {
                 alpha: '\n',
                 settings: SeparatorSetting::new(TokenTypes::None)
+                    .gruppable()
             },
             TokenSeparators::InAlphaRange {
                 alphas: vec![ '.', ',', ':' ],
