@@ -6,6 +6,8 @@ pub enum TokenTypes {
     Arithmetic,
     Groupper,
     Type,
+    LineComment,
+    GroupComment,
     Custom { name:String },
     None
 }
@@ -20,6 +22,8 @@ impl TokenTypes {
                 TokenTypes::Arithmetic => "arithmetic",
                 TokenTypes::Groupper => "groupper",
                 TokenTypes::Type => "type",
+                TokenTypes::LineComment => "line comment",
+                TokenTypes::GroupComment => "group comment",
                 TokenTypes::Custom { name } => name,
                 TokenTypes::None => "none",
             }

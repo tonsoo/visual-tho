@@ -33,8 +33,26 @@ impl Language for VisuAlg {
                 settings: SeparatorSetting::new(TokenTypes::Keyword)
             },
             TokenSeparators::InAlphaRange {
-                alphas: vec![ '"', '\'', '[', ']', '(', ')', '{', '}' ],
+                alphas: vec![ '\'', '[', ']', '(', ')', '{', '}' ],
                 settings: SeparatorSetting::new(TokenTypes::Groupper)
+            },
+            TokenSeparators::AlphaUntil {
+                alpha: '"',
+                end: Some('"'),
+                skip_content: false,
+                settings: SeparatorSetting::new(TokenTypes::Groupper)
+            },
+            TokenSeparators::WordUntil {
+                word: "//".to_string(),
+                end: None,
+                skip_content: false,
+                settings: SeparatorSetting::new(TokenTypes::LineComment).gruppable()
+            },
+            TokenSeparators::WordUntil {
+                word: "/*".to_string(),
+                end: Some("*/".to_string()),
+                skip_content: false,
+                settings: SeparatorSetting::new(TokenTypes::GroupComment)
             },
             TokenSeparators::InAlphaRange {
                 alphas: vec![ '+', '-', '*', '/' ],

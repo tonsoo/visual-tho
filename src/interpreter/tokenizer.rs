@@ -1,3 +1,6 @@
+use eframe::glow::TEXTURE_VIEW_MIN_LEVEL;
+use egui::util::undoer::Settings;
+
 use super::tokens::schema::TokenTypes;
 use super::{language::Language, tokens::token::{Token, TokenIndex}};
 use super::tokens::separator::{SeparatorSetting, TokenSeparators};
@@ -32,23 +35,31 @@ pub struct Tokenizer {
     language:Box<dyn Language>,
     tokens:Vec<Token>,
     index:usize,
+    search_token:Option<TokenizerSearch>
+}
+
+struct TokenizerSearch {
+    token:Separator,
+    skip_content:bool,
 }
 
 #[derive(Clone)]
-struct Separator {
-    value:String,
-    settings:SeparatorSetting,
-}
+enum Separator {
+    Simple {
+        value:String,
+        settings:SeparatorSetting,
+    },
 
-impl Separator {
-    fn new(value:String, settings:SeparatorSetting) -> Self {
-        Self { value, settings }
+    WithEnd {
+        value:String,
+        end:Option<String>,
+        settings:SeparatorSetting,
     }
 }
 
 impl Tokenizer {
     pub fn new(language:Box<dyn Language>) -> Self {
-        Self { language, tokens: vec![], index: 0 }
+        Self { language, tokens: vec![], index: 0, search_token: None }
     }
 
     fn get_max_range(&self, separators:&Vec<Separator>) -> Range<usize> {
@@ -59,12 +70,34 @@ impl Tokenizer {
         let mut min = 0;
         let mut max = 0;
 
-        if let Some(_min) = separators.iter().min_by_key(|a| a.value.chars().count()) {
-            min = _min.value.chars().count();
+        let min_fn = |a:&Separator| -> usize {
+            match a {
+                Separator::Simple { value, .. } => value.chars().count(),
+                Separator::WithEnd { value, end, .. } => {
+                    let v = value.chars().count();
+                    let e = end.as_ref().map_or(v, |e| e.chars().count());
+                    v.min(e)
+                },
+            }
+        };
+
+        let max_fn = |a:&Separator| -> usize {
+            match a {
+                Separator::Simple { value, .. } => value.chars().count(),
+                Separator::WithEnd { value, end, .. } => {
+                    let v = value.chars().count();
+                    let e = end.as_ref().map_or(v, |e| e.chars().count());
+                    v.max(e)
+                },
+            }
+        };
+
+        if let Some(_min) = separators.iter().min_by_key(|a| min_fn(a)) {
+            min = min_fn(_min);
         }
 
-        if let Some(_max) = separators.iter().max_by_key(|a| a.value.chars().count()) {
-            max = _max.value.chars().count();
+        if let Some(_max) = separators.iter().max_by_key(|a| max_fn(a)) {
+            max = max_fn(_max);
         }
 
         Range::new(min, max)
@@ -80,24 +113,77 @@ impl Tokenizer {
         for s in separators {
             match s {
                 Alpha { alpha, settings }
-                    => new_separators.push(Separator::new(String::from(alpha), settings)),
+                    => new_separators.push(
+                        Separator::Simple {
+                            value: alpha.to_string(),
+                            settings: settings
+                        }
+                    ),
                 InAlphaRange { alphas, settings } => {
                     for a in alphas {
-                        new_separators.push(Separator::new(String::from(a), settings.clone()))
+                        new_separators.push(
+                            Separator::Simple {
+                                value: a.to_string(),
+                                settings: settings.clone()
+                            }
+                        )
                     }
                 },
+                AlphaUntil { alpha, end, skip_content, settings } => {
+                    new_separators.push(
+                        Separator::WithEnd {
+                            value: alpha.to_string(),
+                            end: end.map(|c| c.to_string()),
+                            settings: settings
+                        }
+                    )
+                }
 
-                Word { word, settings } => new_separators.push(Separator::new(word, settings)),
+                Word { word, settings } => new_separators.push(
+                    Separator::Simple {
+                        value: word,
+                        settings: settings
+                    }
+                ),
                 InWordRange { words, settings } => {
                     for w in words {
-                        new_separators.push(Separator::new(w, settings.clone()));
+                        new_separators.push(
+                            Separator::Simple {
+                                value: w,
+                                settings: settings.clone()
+                            }
+                        );
                     }
                 }
+                WordUntil { word, end, skip_content, settings } => new_separators.push(
+                    Separator::WithEnd {
+                        value: word,
+                        end: end,
+                        settings: settings
+                    }
+                )
             }
         }
 
-        new_separators.sort_by(|a, b|
-            b.value.chars().count().cmp(&a.value.chars().count())
+        new_separators.sort_by(|a, b| {
+                let b_value = match b {
+                    Separator::Simple { value, .. } => value.chars().count(),
+                    Separator::WithEnd { value, end, .. } => {
+                        let v = value.chars().count();
+                        let e = end.as_ref().map_or(v, |e| e.chars().count());
+                        v.max(e)
+                    },
+                };
+                let a_value = match a {
+                    Separator::Simple { value, .. } => value.chars().count(),
+                    Separator::WithEnd { value, end, .. } => {
+                        let v = value.chars().count();
+                        let e = end.as_ref().map_or(v, |e| e.chars().count());
+                        v.max(e)
+                    },
+                };
+                b_value.cmp(&a_value)
+            }
         );
 
         new_separators
@@ -117,19 +203,28 @@ impl Tokenizer {
         for (i, char) in code.char_indices() {
             self.index = i;
 
-            let char_text = String::from(char);
+            let char_text = char.to_string();
             buffer += &char_text;
 
             if buffer.chars().count() < buffer_range.max {
                 continue;
             }
 
+            let awaiting_token = self.search_token.is_some();
+            let skip_content = self.search_token.as_ref().map_or(false, |s| s.skip_content);
+
             self.bufferize(&mut buffer, &separators);
 
             if buffer.chars().count() >= buffer_range.max {
                 let mut chars = buffer.chars();
                 if let Some(a_char) = chars.next() {
-                    self.push_unknown_character(a_char, chars.clone().count());
+                    println!("a: {}", a_char);
+                    if !awaiting_token || !skip_content {
+                        println!("\tpushed");
+                        self.push_unknown_character(a_char, chars.clone().count(), awaiting_token);
+                    } else {
+                        println!("\tskipped {} - {}", awaiting_token, skip_content);
+                    }
                 }
                 buffer = chars.collect();
             }
@@ -166,20 +261,76 @@ impl Tokenizer {
     fn tokenize_buffer_piece(&mut self, buffer:String, separators:&Vec<Separator>) -> usize {
         for separator in separators {
             let mut compare = buffer.clone();
-            let value = separator.value.clone();
+            let mut is_wrapper = false;
+            let mut sep_settings:Option<SeparatorSetting> = None;
+            let temp_value:String = if let Some(search) = &self.search_token {
+                match &search.token {
+                    Separator::WithEnd { value, end, settings } => {
+                        sep_settings = Some(settings.clone());
+                        is_wrapper = true;
+                        match end {
+                            Some(v) => v.clone(),
+                            None => "\n".to_string()
+                        }
+                    },
+                    Separator::Simple { value, settings } => {
+                        sep_settings = Some(settings.clone());
+                        value.to_string()
+                    }
+                }
+            } else {
+                match separator {
+                    Separator::Simple { value, settings } => {
+                        sep_settings = Some(settings.clone());
+                        value.clone()
+                    },
+                    Separator::WithEnd { value, end, settings } => {
+                        sep_settings = Some(settings.clone());
+                        is_wrapper = true;
+                        if self.search_token.is_none() {
+                            value.clone()
+                        } else {
+                            end.clone().unwrap_or_else(|| "\n".to_string())
+                        }
+                    },
+                }
+            };
+            let value = temp_value.clone();
             
-            if !separator.settings.is_case_sensitive() {
+            if !sep_settings.clone().map_or(false, |s| s.is_case_sensitive()) {
                 compare = compare.to_lowercase();
             }
-            
+
             if !compare.starts_with(&value) {
                 continue
             }
 
-            let schema = separator.settings.map().clone();
+            let awaiting_token = self.search_token.is_some();
+            let skip_content = self.search_token.as_ref().map_or(false, |s| s.skip_content);
+
+            if is_wrapper && !awaiting_token {
+                self.search_token = Some(
+                    TokenizerSearch {
+                        token: separator.clone(),
+                        skip_content: false
+                    }
+                );
+            }
+
+            if awaiting_token {
+                let chars: Vec<char> = value.chars().collect();
+                let len = chars.len();
+                for &char in chars.iter().take(chars.len().saturating_sub(1)) {
+                    self.push_unknown_character(char, len, true);
+                }
+                self.search_token = None;
+                // return chars.count();
+            }
+
+            let schema = sep_settings.clone().map_or(TokenTypes::None, |s| s.map().clone());
 
             let value_length = value.chars().count();
-            if separator.settings.is_inclusive() {
+            if sep_settings.map_or(false, |s| s.is_inclusive()) {
                 let length = compare.chars().count() - 1;
                 let mut start = 0;
                 if self.index > length {
@@ -201,33 +352,44 @@ impl Tokenizer {
         0
     }
 
-    fn push_unknown_character(&mut self, char:char, buffer_length:usize) {
-        let last = self.tokens.last();
+    fn merge_last_token(&mut self, new_text:String, index:usize, condition:Box<dyn Fn(&Token) -> bool>) -> Option<Token> {
         let mut new_token:Option<Token> = None;
+        let last = self.tokens.last();
+        if let Some(token) = last {
+            if condition(token) {
+                let mut value = token.value().to_string();
+                value.push_str(&new_text);
+                new_token = Some(Token::new(
+                    TokenIndex::new(token.index().start(), index),
+                    value,
+                    TokenTypes::Custom { name: "unknown".to_string() }
+                ));
+                self.pop_token();
+            }
+        }
+        new_token
+    }
+
+    fn push_unknown_character(&mut self, char:char, buffer_length:usize, merge:bool) {
         let mut index = 0;
         if self.index > buffer_length {
             index = self.index - buffer_length;
         }
-        if let Some(token) = last {
+
+        let mut new_token = self.merge_last_token(char.to_string(), index, Box::new(|token| {
             if let TokenTypes::Custom { name } = token.schema() {
                 if name == "unknown" {
-                    let mut value = token.value().to_string();
-                    value.push_str(&String::from(char));
-                    new_token = Some(Token::new(
-                        TokenIndex::new(token.index().start(), index),
-                        value,
-                        TokenTypes::Custom { name: String::from("unknown") }
-                    ));
-                    self.pop_token();
+                    return true;
                 }
             }
-        }
+            false
+        }));
 
         if new_token.is_none() {
             new_token = Some(Token::new(
                 TokenIndex::new(index, index + 1),
-                String::from(char),
-                TokenTypes::Custom { name: String::from("unknown") }
+                char.to_string(),
+                TokenTypes::Custom { name: "unknown".to_string() }
             ));
         }
 

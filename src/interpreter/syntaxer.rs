@@ -1,4 +1,4 @@
-use super::tokenizer::Tokenizer;
+use super::{rules::rule::SyntaxRule, tokenizer::Tokenizer};
 
 pub struct Syntaxer {
     tokenizer:Tokenizer,
@@ -9,7 +9,7 @@ impl Syntaxer {
         Self { tokenizer }
     }
 
-    pub fn validate_syntax(&self) {
+    pub fn validate_syntax(&self, rules:Vec<SyntaxRule>) {
         
     }
 }

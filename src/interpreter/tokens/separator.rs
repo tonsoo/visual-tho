@@ -54,6 +54,13 @@ pub enum TokenSeparators {
         settings: SeparatorSetting
     },
 
+    AlphaUntil {
+        alpha:char,
+        end:Option<char>,
+        skip_content:bool,
+        settings: SeparatorSetting
+    },
+
     Word {
         word:String,
         settings: SeparatorSetting
@@ -61,6 +68,13 @@ pub enum TokenSeparators {
 
     InWordRange {
         words:Vec<String>,
+        settings: SeparatorSetting
+    },
+    
+    WordUntil {
+        word:String,
+        end:Option<String>,
+        skip_content:bool,
         settings: SeparatorSetting
     },
 }
@@ -71,7 +85,8 @@ impl TokenSeparators {
 
         match separator {
             Alpha { .. }
-            | InAlphaRange { .. } => true,
+            | InAlphaRange { .. }
+            | AlphaUntil { .. } => true,
             _ => false
         }
     }
