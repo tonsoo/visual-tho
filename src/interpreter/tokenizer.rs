@@ -308,23 +308,24 @@ impl Tokenizer {
             let awaiting_token = self.search_token.is_some();
             let skip_content = self.search_token.as_ref().map_or(false, |s| s.skip_content);
 
-            if is_wrapper && !awaiting_token {
-                self.search_token = Some(
-                    TokenizerSearch {
-                        token: separator.clone(),
-                        skip_content: false
-                    }
-                );
-            }
+            if is_wrapper {
+                if !awaiting_token {
+                    self.search_token = Some(
+                        TokenizerSearch {
+                            token: separator.clone(),
+                            skip_content: false
+                        }
+                    );
+                } else {
+                    let chars: Vec<char> = value.chars().collect();
+                    let len = chars.len();
 
-            if awaiting_token {
-                let chars: Vec<char> = value.chars().collect();
-                let len = chars.len();
-                for &char in chars.iter().take(chars.len().saturating_sub(1)) {
-                    self.push_unknown_character(char, len, true);
+                    for &char in chars.iter().take(chars.len().saturating_sub(1 + value.len())) {
+                        self.push_unknown_character(char, len, true);
+                    }
+                    
+                    self.search_token = None;
                 }
-                self.search_token = None;
-                // return chars.count();
             }
 
             let schema = sep_settings.clone().map_or(TokenTypes::None, |s| s.map().clone());

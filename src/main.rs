@@ -7,7 +7,9 @@ fn main() {
     if atty::is(atty::Stream::Stdin) {
         let lang = VisuAlg {};
 
-        let mut int = Interpreter::from_file(String::from("tests/scripts/visualg/script-4.alg"));
+        let mut int = Interpreter::from_file(
+            String::from("tests/scripts/visualg/script-4.alg")
+        );
 
         int.interpret(Box::new(lang));
 
