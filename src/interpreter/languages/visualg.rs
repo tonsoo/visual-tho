@@ -4,6 +4,7 @@ use crate::interpreter::tokens::separator::{SeparatorSetting};
 use super::super::tokens::separator::TokenSeparators;
 
 use super::super::language::Language;
+use super::super::rules::rule::{SyntaxRule, SyntaxType, SyntaxGroup};
 
 pub struct VisuAlg;
 
@@ -109,6 +110,18 @@ impl Language for VisuAlg {
                 ],
                 settings: SeparatorSetting::new(TokenTypes::Type)
             },
+        ]
+    }
+
+    fn syntax() -> Vec<SyntaxGroup> {
+        vec![
+            SyntaxGroup::new(
+                vec![
+                    SyntaxRule::new(
+                        SyntaxType::Keyword("if".to_string())
+                    )
+                ]
+            )
         ]
     }
 }
